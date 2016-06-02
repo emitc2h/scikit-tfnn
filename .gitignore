@@ -1,0 +1,3 @@
+*.pyc
+*.ipynb
+MNIST_data/
