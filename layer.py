@@ -26,10 +26,14 @@ class Layer(object):
         self.position = None
 
         ## is input layer
-        self.is_input  = False
+        self.is_input = False
 
         ## layer parameters from the constructor
-        self.n_neurons   = n_neurons
+        self.n_neurons = n_neurons
+
+        ## Number of features of a fully connected layer is 1 by default, in case the layer is used
+        ## as an input layer to a convolutional layer
+        self.n_features = 1
 
         assert activation in self.activations, 'allowed activations are: {0}'.format(', '.join(self.activations))
         self.activation  = activation
@@ -94,7 +98,7 @@ class ConvLayer(Layer):
         img_size=(10,10),
         patch_size=(5,5),
         n_features=10,
-        strides=(1,1,1,1),
+        strides=(1,1),
         padding='SAME',
         pooling=False,
         pooling_size=(2,2),
@@ -119,6 +123,7 @@ class ConvLayer(Layer):
         self.padding    = padding
 
         ## Properties of the pooling layer
+        assert pooling in [False, 'max', 'avg']
         self.pooling      = pooling
         self.pooling_size = pooling_size
 
@@ -140,12 +145,12 @@ class ConvLayer(Layer):
         assert not input_layer.output is None, 'Layer {0} was not built, cannot be used as input to other layer.'.format(input_layer.position)
 
         ## Reshape the image as a 2D array with placeholder dimensions
-        self.input_image = tf.reshape(input_layer.output, [-1, self.img_size[0], self.img_size[1], 1])
+        self.input_image = tf.reshape(input_layer.output, [-1, self.img_size[0], self.img_size[1], input_layer.n_features])
 
         ## Initialize the weights
         self.weights = tf.Variable(
             tf.truncated_normal(
-                shape=[self.patch_size[0], self.patch_size[1], 1, self.n_features],
+                shape=[self.patch_size[0], self.patch_size[1], input_layer.n_features, self.n_features],
                 stddev=1.0/math.sqrt(self.n_neurons),
                 seed=self.random_seed
                 )
@@ -155,20 +160,72 @@ class ConvLayer(Layer):
         self.biases = tf.Variable(
             tf.constant(
                 0.1,
-                shape=[self.n_neurons]
+                shape=[self.n_features]
                 )
             )
 
         self.conv_output = tf.nn.relu(
-            tf.nn.conv2d(self.input_image, self.weights, strides=self.strides, padding=self.padding) + self.biases
+            tf.nn.conv2d(self.input_image, self.weights, strides=[1, self.strides[0], self.strides[1], 1], padding=self.padding) + self.biases
             )
 
-        if not pooling:
-            self.output = self.conv_output
+        if not self.pooling:
+            self.output_image = self.conv_output
         else:
-            self.output = getattr(tf.nn, '{0}_pool'.format(self.pooling))(self.conv_output)
+            self.output_image = getattr(tf.nn, '{0}_pool'.format(self.pooling))(
+                self.conv_output,
+                ksize=[1, self.pooling_size[0], self.pooling_size[1], 1],
+                strides=[1, self.pooling_size[0], self.pooling_size[1], 1],
+                padding='SAME'
+                )
+
+        ## Flatten the output, not the most efficient way to do this, but ensures
+        ## compatibility with fully-connected layers
+
+        ## First, calculate the dimensions of the output array
+        self.n_neurons = (self.img_size[0]//self.pooling_size[0] + self.img_size[0]%self.pooling_size[0]) * \
+             (self.img_size[1]//self.pooling_size[1] + self.img_size[1]%self.pooling_size[1]) * \
+             self.n_features
+
+        self.output = tf.reshape(
+            self.output_image,
+            [-1, self.n_neurons]
+            )
 
 
+
+## ============================================
+class DropoutLayer(Layer):
+    """
+    A class to apply a dropout function on the previous layer
+    """
+
+    ## --------------------------------------------
+    def __init__(
+        self,
+        dropout_rate=0.5,
+        random_seed=42
+        ):
+        """
+        Constructor
+        """
+
+        self.dropout_rate=dropout_rate
+
+        ## Set generic layer properties
+        super(DropoutLayer, self).__init__(random_seed=random_seed)
+
+
+
+    ## --------------------------------------------
+    def build(self, input_layer):
+        """
+        builds the dropout layer into Tensorflow
+        """
+
+        self.n_neurons  = input_layer.n_neurons
+        self.activation = input_layer.activation
+        self.keep_prob  = tf.placeholder(tf.float32)
+        self.output     = tf.nn.dropout(input_layer.output, self.keep_prob, seed=self.random_seed)
 
 
 

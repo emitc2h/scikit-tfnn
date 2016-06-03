@@ -207,7 +207,14 @@ class NeuralNetwork(object):
 
             ## Calculate accuracy on validation sample
             if val_provided:
-                current_accuracy = self.session.run(accuracy, feed_dict={self.input_layer.output : val_X, self.targets : val_y})
+
+                ## Construct the feed_dict
+                feed_dict={self.input_layer.output : val_X, self.targets : val_y}
+                for layer in self.hidden_layers:
+                    if hasattr(layer, 'dropout_rate'):
+                        feed_dict[layer.keep_prob] = 1.0
+
+                current_accuracy = self.session.run(accuracy, feed_dict=feed_dict)
 
                 ## Fill in the accuracy buffer
                 accuracy_buffer.append(current_accuracy)
@@ -231,13 +238,20 @@ class NeuralNetwork(object):
             batches = self.create_mini_batches(X, y_one_hot)
 
             for batch in batches:
+
+                ## Construct the feed_dict
+                feed_dict={
+                    self.input_layer.output : batch[0],
+                    self.targets            : batch[1],
+                    self.reg_lambda_param   : self.reg_lambda,
+                    self.batch_size         : self.mini_batch_size
+                }
+                for layer in self.hidden_layers:
+                    if hasattr(layer, 'dropout_rate'):
+                        feed_dict[layer.keep_prob] = layer.dropout_rate
+
                 self.train_step.run(
-                    feed_dict={
-                        self.input_layer.output : batch[0],
-                        self.targets            : batch[1],
-                        self.reg_lambda_param   : self.reg_lambda,
-                        self.batch_size         : self.mini_batch_size
-                    }
+                    feed_dict=feed_dict
                 )
 
 
