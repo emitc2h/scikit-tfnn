@@ -1,0 +1,65 @@
+Example usage: replicating the Deep MNIST for Experts example provided in the Tensorflow documentation (https://www.tensorflow.org/versions/r0.8/tutorials/mnist/pros/index.html)
+
+[code]
+from tensorflow.examples.tutorials.mnist import input_data
+mnist = input_data.read_data_sets("MNIST_data/", one_hot=True)
+
+X_train, y_train = mnist.train.images, mnist.train.labels
+X_test, y_test   = mnist.test.images, mnist.test.labels
+X_val, y_val     = mnist.validation.images, mnist.validation.labels
+
+from layer import Layer, ConvLayer, DropoutLayer
+from neuralnetwork import NeuralNetwork
+
+from sklearn.metrics import log_loss
+from sklearn.metrics import accuracy_score
+
+import numpy as np
+
+nn = NeuralNetwork(
+    hidden_layers = [
+        ConvLayer(
+            img_size=(28,28),
+            patch_size=(5,5),
+            n_features=32,
+            strides=(1,1),
+            padding='SAME',
+            pooling='max',
+            pooling_size=(2,2)
+        ),
+        ConvLayer(
+            img_size=(14,14),
+            patch_size=(5,5),
+            n_features=64,
+            strides=(1,1),
+            padding='SAME',
+            pooling='max',
+            pooling_size=(2,2)
+        ),
+        Layer(
+            n_neurons=1024,
+            activation='relu'
+        ),
+        DropoutLayer(
+            dropout_rate=0.5
+        )
+    ],
+    learning_algorithm='Adam',
+    output_activation='softmax',
+    cost_function='cross-entropy',
+    regularization='none',
+    reg_lambda=0.25,
+    learning_rate=1e-4,
+    early_stopping=False,
+    stagnation=10,
+    n_epochs=10,
+    mini_batch_size=50
+    )
+
+nn.fit(X_train, y_train, verbose=True, val_X=X_val, val_y=y_val)
+
+predictions = nn.predict_proba(X_test)
+print 'log loss:', log_loss(y_test, predictions)
+print 'accuracy:', accuracy_score(np.argmax(y_test, axis=1), np.argmax(predictions, axis=1))
+
+[/code]
