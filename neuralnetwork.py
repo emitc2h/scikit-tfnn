@@ -262,6 +262,11 @@ class NeuralNetwork(object):
         returns probabilities for each category, for each sample provided
         """
 
-        return self.output_layer.output.eval(feed_dict={self.input_layer.output: X})
+        feed_dict={self.input_layer.output: X}
+        for layer in self.hidden_layers:
+                if hasattr(layer, 'dropout_rate'):
+                    feed_dict[layer.keep_prob] = 1.0
+
+        return self.output_layer.output.eval(feed_dict=feed_dict)
 
 
