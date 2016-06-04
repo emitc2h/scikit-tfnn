@@ -61,13 +61,22 @@ class Layer(object):
             assert not input_layer.output is None, 'Layer {0} was not built, cannot be used as input to other layer.'.format(input_layer.position)
 
             ## Initialize the weights
-            self.weights = tf.Variable(
-                tf.random_normal(
-                    shape=[input_layer.n_neurons, self.n_neurons],
-                    stddev=1.0/math.sqrt(self.n_neurons),
-                    seed=self.random_seed
+            if self.activation == 'relu':
+                self.weights = tf.Variable(
+                    tf.truncated_normal(
+                        shape=[input_layer.n_neurons, self.n_neurons],
+                        stddev=0.1,
+                        seed=self.random_seed
+                        )
                     )
-                )
+            else:
+                self.weights = tf.Variable(
+                    tf.random_normal(
+                        shape=[input_layer.n_neurons, self.n_neurons],
+                        stddev=1.0/math.sqrt(self.n_neurons),
+                        seed=self.random_seed
+                        )
+                    )
 
             ## Initialize the biases
             self.biases = tf.Variable(
@@ -151,7 +160,7 @@ class ConvLayer(Layer):
         self.weights = tf.Variable(
             tf.truncated_normal(
                 shape=[self.patch_size[0], self.patch_size[1], input_layer.n_features, self.n_features],
-                stddev=1.0/math.sqrt(self.n_neurons),
+                stddev=0.1,
                 seed=self.random_seed
                 )
             )

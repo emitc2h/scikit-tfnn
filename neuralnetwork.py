@@ -32,8 +32,9 @@ class NeuralNetwork(object):
     A Neural network class with a scikit-compliant interface
     """
 
-    cost_functions  = ['log-likelihood', 'cross-entropy']
-    regularizations = ['l1', 'l2', 'none']
+    cost_functions      = ['log-likelihood', 'cross-entropy']
+    regularizations     = ['l1', 'l2', 'none']
+    learning_algorithms = ['Adam', 'GradientDescent', 'AdaGrad', 'Momentum', 'Ftrl', 'RMSProp']
 
 
     ## --------------------------------------------
@@ -60,6 +61,7 @@ class NeuralNetwork(object):
         self.hidden_layers = hidden_layers
 
         ## Parameters from the constructor
+        assert learning_algorithm in self.learning_algorithms, 'Available learning algorithms are {0}'.format(', '.join(self.learning_algorithms))
         self.learning_algorithm = learning_algorithm
 
         assert cost_function in self.cost_functions, 'Available cost functions are {0}'.format(', '.join(self.cost_functions))
@@ -110,9 +112,10 @@ class NeuralNetwork(object):
         ## Define the cost function
         self.cost = None
         if self.cost_function == 'log-likelihood':
-            self.cost = tf.reduce_mean(-tf.log(tf.reduce_sum(self.targets * self.output_layer.output, reduction_indices=[1])))
-        else:
-            self.cost = tf.reduce_mean(-tf.reduce_sum(self.targets * tf.log(self.output_layer.output), reduction_indices=[1]))
+
+            self.cost = tf.reduce_mean(-tf.log(1e-37 + tf.reduce_sum(self.targets * self.output_layer.output, reduction_indices=[1])))
+        else: ## cross-entropy
+            self.cost = tf.reduce_mean(-tf.reduce_sum(self.targets * tf.log(1e-37 + self.output_layer.output), reduction_indices=[1]))
 
         ## Define the regularization parameters and function
         self.reg_lambda_param = tf.placeholder(tf.float32)
@@ -195,6 +198,12 @@ class NeuralNetwork(object):
             val_provided = True
 
         if val_provided:
+
+            if len(val_y.shape) < 2:
+                val_y_one_hot = one_hot_vector(val_y)
+            else:
+                val_y_one_hot = val_y
+
             correct_prediction = tf.equal(tf.argmax(self.output_layer.output, 1), tf.argmax(self.targets, 1))
             accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
             accuracy_buffer = []
@@ -209,7 +218,7 @@ class NeuralNetwork(object):
             if val_provided:
 
                 ## Construct the feed_dict
-                feed_dict={self.input_layer.output : val_X, self.targets : val_y}
+                feed_dict={self.input_layer.output : val_X, self.targets : val_y_one_hot}
                 for layer in self.hidden_layers:
                     if hasattr(layer, 'dropout_rate'):
                         feed_dict[layer.keep_prob] = 1.0
@@ -253,6 +262,7 @@ class NeuralNetwork(object):
                 self.train_step.run(
                     feed_dict=feed_dict
                 )
+
 
 
 
