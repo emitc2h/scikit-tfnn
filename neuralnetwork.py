@@ -34,7 +34,7 @@ class NeuralNetwork(object):
 
     cost_functions      = ['log-likelihood', 'cross-entropy']
     regularizations     = ['l1', 'l2', 'none']
-    learning_algorithms = ['Adam', 'GradientDescent', 'AdaGrad', 'Momentum', 'Ftrl', 'RMSProp']
+    learning_algorithms = ['Adam', 'GradientDescent', 'Adagrad', 'Ftrl', 'RMSProp']
 
 
     ## --------------------------------------------
