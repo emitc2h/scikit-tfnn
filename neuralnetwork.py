@@ -49,6 +49,7 @@ class NeuralNetwork(object):
         learning_rate=0.1,
         early_stopping=False,
         stagnation=10,
+        target_accuracy=None,
         n_epochs=10,
         mini_batch_size=10,
         ):
@@ -76,6 +77,7 @@ class NeuralNetwork(object):
 
         self.early_stopping     = early_stopping
         self.stagnation         = stagnation
+        self.target_accuracy    = target_accuracy
 
         self.n_epochs           = n_epochs
         self.mini_batch_size    = mini_batch_size
@@ -225,6 +227,18 @@ class NeuralNetwork(object):
 
                 current_accuracy = self.session.run(accuracy, feed_dict=feed_dict)
 
+
+                ## Print out epoch, accuracy
+                if verbose:
+                    print 'Epoch {0}, validation sample accuracy: {1}'.format(i, current_accuracy)
+                else:
+                    print 'Epoch {0} ...'.format(i)
+
+
+                if not self.target_accuracy is None:
+                    if current_accuracy >= self.target_accuracy:
+                        break
+
                 ## Fill in the accuracy buffer
                 accuracy_buffer.append(current_accuracy)
                 if len(accuracy_buffer) > self.stagnation:
@@ -235,14 +249,8 @@ class NeuralNetwork(object):
                     lin_reg_params = np.polyfit(range(len(accuracy_buffer)), accuracy_buffer, 1)
                     rel_accuracy_change = lin_reg_params[0]/(1.0 - accuracy_buffer[0])
                     if self.early_stopping:
-                        if rel_accuracy_change < 0.0001:
+                        if rel_accuracy_change < 0.00001:
                             break
-
-            ## Print out epoch, accuracy
-            if verbose:
-                print 'Epoch {0}, validation sample accuracy: {1}'.format(i, current_accuracy)
-            else:
-                print 'Epoch {0} ...'.format(i)
 
             batches = self.create_mini_batches(X, y_one_hot)
 
