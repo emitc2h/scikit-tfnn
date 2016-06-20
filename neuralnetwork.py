@@ -82,6 +82,13 @@ class NeuralNetwork(object):
         self.n_epochs           = n_epochs
         self.mini_batch_size    = mini_batch_size
 
+        ## functions to keep around
+        self.correct_prediction = None
+        self.accuracy           = None
+        self.accuracy_buffer    = []
+        self.current_epoch      = 0 
+
+
 
 
     ## --------------------------------------------
@@ -170,12 +177,14 @@ class NeuralNetwork(object):
 
 
 
-
     ## --------------------------------------------
-    def fit(self, X, y, verbose=False, val_X=None, val_y=None):
+    def prepare_fit(self, X, y, verbose=False, val_X=None, val_y=None):
         """
-        fits the model to the training data
+        A few steps to prepare for the fit
         """
+
+        ## Reset number of epochs
+        self.current_epoch = 0
 
         ## Make sure input variables and target are compatible
 
@@ -206,70 +215,99 @@ class NeuralNetwork(object):
             else:
                 val_y_one_hot = val_y
 
-            correct_prediction = tf.equal(tf.argmax(self.output_layer.output, 1), tf.argmax(self.targets, 1))
-            accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-            accuracy_buffer = []
+            self.correct_prediction = tf.equal(tf.argmax(self.output_layer.output, 1), tf.argmax(self.targets, 1))
+            self.accuracy = tf.reduce_mean(tf.cast(self.correct_prediction, tf.float32))
+            self.accuracy_buffer = []
 
-        ## Learning rate controller
-        lrate_factor = 1.0
-
-        ## Loop over epochs
-        for i in range(self.n_epochs):
-
-            ## Calculate accuracy on validation sample
-            if val_provided:
-
-                ## Construct the feed_dict
-                feed_dict={self.input_layer.output : val_X, self.targets : val_y_one_hot}
-                for layer in self.hidden_layers:
-                    if hasattr(layer, 'dropout_rate'):
-                        feed_dict[layer.keep_prob] = 1.0
-
-                current_accuracy = self.session.run(accuracy, feed_dict=feed_dict)
+        return y_one_hot, val_y_one_hot
 
 
-                ## Print out epoch, accuracy
-                if verbose:
-                    print 'Epoch {0}, validation sample accuracy: {1}'.format(i, current_accuracy)
-                else:
-                    print 'Epoch {0} ...'.format(i)
+
+    ## --------------------------------------------
+    def epoch(self, X, y_one_hot, verbose=False, val_X=None, val_y_one_hot=None):
+        """
+        train for a single epoch
+        """
+
+        current_accuracy = 0.0
+
+        if self.current_epoch > self.n_epochs:
+            return current_accuracy, False
+
+        ## Calculate accuracy on validation sample
+        if val_provided:
+
+            ## Construct the feed_dict
+            feed_dict={self.input_layer.output : val_X, self.targets : val_y_one_hot}
+            for layer in self.hidden_layers:
+                if hasattr(layer, 'dropout_rate'):
+                    feed_dict[layer.keep_prob] = 1.0
+
+            current_accuracy = self.session.run(self.accuracy, feed_dict=feed_dict)
 
 
-                if not self.target_accuracy is None:
-                    if current_accuracy >= self.target_accuracy:
-                        break
+            ## Print out epoch, accuracy
+            if verbose:
+                print 'Epoch {0}, validation sample accuracy: {1}'.format(self.current_epoch, current_accuracy)
+            else:
+                print 'Epoch {0} ...'.format(self.current_epoch)
 
-                ## Fill in the accuracy buffer
-                accuracy_buffer.append(current_accuracy)
-                if len(accuracy_buffer) > self.stagnation:
-                    accuracy_buffer.pop(0)
 
-                ## Estimate accuracy change on the validation sample
-                if i > 0:
-                    lin_reg_params = np.polyfit(range(len(accuracy_buffer)), accuracy_buffer, 1)
-                    rel_accuracy_change = lin_reg_params[0]/(1.0 - accuracy_buffer[0])
-                    if self.early_stopping:
-                        if rel_accuracy_change < 0.00001:
-                            break
+            if not self.target_accuracy is None:
+                if current_accuracy >= self.target_accuracy:
+                    return current_accuracy, False
 
-            batches = self.create_mini_batches(X, y_one_hot)
+            ## Fill in the accuracy buffer
+            self.accuracy_buffer.append(current_accuracy)
+            if len(self.accuracy_buffer) > self.stagnation:
+                self.accuracy_buffer.pop(0)
 
-            for batch in batches:
+            ## Estimate accuracy change on the validation sample
+            if i > 0:
+                lin_reg_params = np.polyfit(range(len(self.accuracy_buffer)), self.accuracy_buffer, 1)
+                rel_accuracy_change = lin_reg_params[0]/(1.0 - self.accuracy_buffer[0])
+                if self.early_stopping:
+                    if rel_accuracy_change < 0.00001:
+                        return current_accuracy, False
 
-                ## Construct the feed_dict
-                feed_dict={
-                    self.input_layer.output : batch[0],
-                    self.targets            : batch[1],
-                    self.reg_lambda_param   : self.reg_lambda,
-                    self.batch_size         : self.mini_batch_size
-                }
-                for layer in self.hidden_layers:
-                    if hasattr(layer, 'dropout_rate'):
-                        feed_dict[layer.keep_prob] = layer.dropout_rate
 
-                self.train_step.run(
-                    feed_dict=feed_dict
-                )
+        batches = self.create_mini_batches(X, y_one_hot)
+
+        for batch in batches:
+
+            ## Construct the feed_dict
+            feed_dict={
+                self.input_layer.output : batch[0],
+                self.targets            : batch[1],
+                self.reg_lambda_param   : self.reg_lambda,
+                self.batch_size         : self.mini_batch_size
+            }
+            for layer in self.hidden_layers:
+                if hasattr(layer, 'dropout_rate'):
+                    feed_dict[layer.keep_prob] = layer.dropout_rate
+
+            self.train_step.run(
+                feed_dict=feed_dict
+            )
+
+        self.current_epoch += 1
+
+        return current_accuracy, True
+
+
+
+    ## --------------------------------------------
+    def fit(self, X, y, verbose=False, val_X=None, val_y=None):
+        """
+        fits the model to the training data
+        """
+
+        y_one_hot, val_y_one_hot = self.prepare_fit(X, y, verbose, val_X, val_y)
+
+        status = True
+
+        while(status):
+            _, status = self.epoch(X, y_one_hot, verbose, val_X, val_y_one_hot)
 
 
 
