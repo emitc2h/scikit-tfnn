@@ -234,6 +234,10 @@ class NeuralNetwork(object):
         if self.current_epoch > self.n_epochs:
             return current_accuracy, False
 
+        val_provided = False
+        if (not val_X is None) and (not val_y_one_hot is None):
+            val_provided = True
+
         ## Calculate accuracy on validation sample
         if val_provided:
 
@@ -263,7 +267,7 @@ class NeuralNetwork(object):
                 self.accuracy_buffer.pop(0)
 
             ## Estimate accuracy change on the validation sample
-            if i > 0:
+            if self.current_epoch > 0:
                 lin_reg_params = np.polyfit(range(len(self.accuracy_buffer)), self.accuracy_buffer, 1)
                 rel_accuracy_change = lin_reg_params[0]/(1.0 - self.accuracy_buffer[0])
                 if self.early_stopping:
