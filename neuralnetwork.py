@@ -82,6 +82,9 @@ class NeuralNetwork(object):
         self.n_epochs           = n_epochs
         self.mini_batch_size    = mini_batch_size
 
+        ## session
+        self.session = tf.InteractiveSession()
+
         ## functions to keep around
         self.correct_prediction = None
         self.accuracy           = None
@@ -96,9 +99,6 @@ class NeuralNetwork(object):
         """
         Builds the neural network in tensorflow
         """
-
-        ## Start a tensorflow interactive session
-        self.session = tf.InteractiveSession()
 
         ## First, create a placeholder for the targets
         self.targets = tf.placeholder(tf.float32, shape=[None, self.n_categories])
@@ -291,6 +291,7 @@ class NeuralNetwork(object):
                     feed_dict[layer.keep_prob] = layer.dropout_rate
 
             self.train_step.run(
+                session=self.session,
                 feed_dict=feed_dict
             )
 
@@ -327,6 +328,6 @@ class NeuralNetwork(object):
                 if hasattr(layer, 'dropout_rate'):
                     feed_dict[layer.keep_prob] = 1.0
 
-        return self.output_layer.output.eval(feed_dict=feed_dict)
+        return self.output_layer.output.eval(session=self.session, feed_dict=feed_dict)
 
 
