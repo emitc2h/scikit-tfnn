@@ -232,7 +232,7 @@ class NeuralNetwork(object):
         current_accuracy = 0.0
 
         if self.current_epoch > self.n_epochs:
-            return current_accuracy, False
+            return 1.0, False
 
         val_provided = False
         if (not val_X is None) and (not val_y_one_hot is None):
